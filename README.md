@@ -1,7 +1,7 @@
 # MBDS-Python-Streamlit-project
 Python for data analysis II group assignment: Pokemon Battle Simulator
 
-Streamlit link:
+Streamlit link: https://mbds-python-app-projectgit-f3stybvzs5xk94zxki9isx.streamlit.app/
 
 --------------------------------------------------------------------------
 Contribution Section:
