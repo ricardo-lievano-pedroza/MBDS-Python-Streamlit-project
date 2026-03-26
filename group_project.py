@@ -117,7 +117,100 @@ def reset_all():
 ################################################################
 # Jacek
 ################################################################
+@st.cache_data(show_spinner=False)
+def fetch_pokemon_json(q: str):
+    url = f"https://pokeapi.co/api/v2/pokemon/{q.strip().lower()}"
+    r = safe_get(url, timeout=10)
+    if r is None:
+        return None, 0  # network error
 
+    if r.status_code != 200:
+        return None, r.status_code
+
+    try:
+        return r.json(), 200
+    except ValueError:
+        return None, 0
+
+
+@st.cache_data(show_spinner=False)
+def fetch_move_details(move_url: str):
+    r = safe_get(move_url, timeout=10)
+    if r is None:
+        return None
+
+    if r.status_code != 200:
+        return None
+
+    try:
+        m = r.json()
+    except ValueError:
+        return None
+
+    return {
+        "name": m["name"],
+        "power": m["power"],
+        "accuracy": m["accuracy"],
+        "type": m["type"]["name"],
+        "damage_class": m["damage_class"]["name"],
+    }
+
+
+@st.cache_data(show_spinner=False)
+def fetch_type_data(type_name: str):
+    url = f"https://pokeapi.co/api/v2/type/{type_name}"
+    r = safe_get(url, timeout=10)
+    if r is None:
+        return None
+
+    if r.status_code != 200:
+        return None
+
+    try:
+        return r.json()
+    except ValueError:
+        return None
+
+
+@st.cache_data(show_spinner=False)
+def damaging_moves_for_pokemon(pokemon_id: int, pokemon_moves: list, limit: int = 12):
+    moves = []
+    for entry in pokemon_moves:
+        d = fetch_move_details(entry["move"]["url"])
+        if not d:
+            continue
+        if d["power"] is not None and d["power"] > 0:
+            moves.append(d)
+        if len(moves) >= limit:
+            break
+    return moves
+
+
+def effectiveness_multiplier(move_type: str, defender_types: list[str]) -> float:
+    type_data = fetch_type_data(move_type)
+    if not type_data:
+        return 1.0
+
+    dr = type_data["damage_relations"]
+    double_to = {t["name"] for t in dr["double_damage_to"]}
+    half_to = {t["name"] for t in dr["half_damage_to"]}
+    no_to = {t["name"] for t in dr["no_damage_to"]}
+
+    eff = 1.0
+    for dt in defender_types:
+        if dt in double_to:
+            eff *= 2.0
+        elif dt in half_to:
+            eff *= 0.5
+        elif dt in no_to:
+            eff *= 0.0
+    return eff
+
+
+def pick_atk_def(attacker_stats: dict, defender_stats: dict, damage_class: str) -> tuple[int, int]:
+    if damage_class == "physical":
+        return attacker_stats["attack"], defender_stats["defense"]
+    return attacker_stats["special-attack"], defender_stats["special-defense"]
 
 ################################################################
 # Alberto
