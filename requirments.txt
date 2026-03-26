@@ -1,0 +1,8 @@
+"pandas",
+"numpy",
+"requests",
+"streamlit",
+"requests",
+"pandas",
+"plotly",
+"Pillow"

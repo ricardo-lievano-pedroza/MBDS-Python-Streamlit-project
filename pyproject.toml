@@ -1,0 +1,32 @@
+[project]
+name = "pokemon"
+version = "0.1.0"
+description = "Pokemon Battle Simulator"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas",
+    "numpy",
+    "requests",
+    "streamlit",
+    "requests",
+    "pandas",
+    "plotly",
+    "Pillow"
+]
+
+[project.optional-dependencies]
+dev = [
+    "jupyter>=1.1.1",
+    "ipykernel>=7.1.0",
+    "notebook>=7.5.1",
+    "python-dateutil>=2.9.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "jupyter>=1.1.1",
+    "ipykernel>=7.1.0",
+    "notebook>=7.5.1",
+    "python-dateutil>=2.9.0.post0",
+]
