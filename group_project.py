@@ -629,3 +629,64 @@ p1_moves = damaging_moves_for_pokemon(p1["id"], p1["moves"], limit=8)
 ################################################################
 # Blanca
 ################################################################
+    st.subheader("Combat Simulation")
+
+    m1 = st.session_state.get("p1_move")
+    m2 = st.session_state.get("p2_move")
+
+    if m1 and m2:
+        st.success("Ready to battle!")
+
+    battle_disabled = not (m1 and m2)
+    if st.button("Battle!", type="primary", disabled=battle_disabled):
+        log_rows, hp_hist, winner = run_battle(p1, p2, m1, m2)
+        st.session_state["battle_log"] = log_rows
+        st.session_state["hp_history"] = hp_hist
+        st.session_state["battle_winner"] = winner
+
+    if ("battle_log" in st.session_state and "battle_winner" in st.session_state):
+        st.subheader("Battle Log Table")
+        log_df = pd.DataFrame(st.session_state["battle_log"])
+        for col in ["Move Type", "Class", "Result"]:
+            if col in log_df.columns:
+                log_df[col] = log_df[col].astype(str).str.replace("-", " ").str.title()
+        log_df = log_df.rename(columns={"Class": "Damage Class"})
+        st.dataframe(log_df, use_container_width=True, hide_index=True)
+
+    if "hp_history" in st.session_state:
+        st.subheader("HP Over Time")
+        hp_df = pd.DataFrame(st.session_state["hp_history"])
+        fig_line = px.line(
+            hp_df,
+            x="round",
+            y="hp",
+            color="pokemon",
+            labels={"round": "Round", "hp": "HP", "pokemon": "Pokémon"},
+        )
+        fig_line.update_traces(
+            hovertemplate="<b>%{fullData.name}</b><br>Round: %{x}<br>HP: %{y}<extra></extra>"
+        )
+        st.plotly_chart(fig_line, use_container_width=True)
+
+    if "battle_winner" in st.session_state:
+        st.subheader("And the winner is...")
+
+        winner = st.session_state["battle_winner"]
+
+        winner_sprite_url = None
+        if winner == p1_name:
+            winner_sprite_url = p1["sprites"].get("front_default")
+        elif winner == p2_name:
+            winner_sprite_url = p2["sprites"].get("front_default")
+
+        if winner_sprite_url:
+            img = load_sprite_scaled(winner_sprite_url, scale=5)
+            if img is not None:
+                c1, c2, c3 = st.columns([1, 1, 1])
+                with c2:
+                    st.image(img)
+
+        st.success(f"🏆 {winner} wins the battle!")
+
+    if st.button("Reset"):
+        reset_all()
