@@ -1,6 +1,3 @@
-################################################################
-# Ricardo
-################################################################
 import streamlit as st 
 import requests
 import time
@@ -111,12 +108,26 @@ def reset_all():
         if k in st.session_state:
             del st.session_state[k]
     st.rerun()
+    
+def type_badge_html(t: str) -> str:
+    color = TYPE_COLORS.get(t, "#999999")
+    return f"""
+    <div style="
+        width: 84px;
+        height: 30px;
+        border-radius: 999px;
+        background: {color};
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        font-size: 11px;
+        line-height: 30px;
+        color: rgba(0,0,0,0.85);
+        border: 1px solid rgba(255,255,255,0.35);
+    ">{t.upper()}</div>
+    """
 
-
-
-################################################################
-# Jacek
-################################################################
 @st.cache_data(show_spinner=False)
 def fetch_pokemon_json(q: str):
     url = f"https://pokeapi.co/api/v2/pokemon/{q.strip().lower()}"
@@ -212,9 +223,6 @@ def pick_atk_def(attacker_stats: dict, defender_stats: dict, damage_class: str) 
         return attacker_stats["attack"], defender_stats["defense"]
     return attacker_stats["special-attack"], defender_stats["special-defense"]
 
-################################################################
-# Alberto
-################################################################
 def run_battle(p1: dict, p2: dict, m1: dict, m2: dict) -> tuple[list[dict], list[dict], str]:
     s1 = stats_dict(p1)
     s2 = stats_dict(p2)
@@ -317,9 +325,6 @@ def run_battle(p1: dict, p2: dict, m1: dict, m2: dict) -> tuple[list[dict], list
         winner = "Draw (100-round cap)"
 
     return log, hp_hist, winner
-################################################################
-# Shadi
-################################################################
 
 if "phase" not in st.session_state:
     st.session_state.phase = "input"
@@ -562,12 +567,8 @@ elif st.session_state.phase == "real_battle":
     st.divider()
 
     st.markdown("<h2 style='text-align:center;'>Move Selection</h2>", unsafe_allow_html=True)
-
-
-################################################################
-# Mateus 
-################################################################
-p1_moves = damaging_moves_for_pokemon(p1["id"], p1["moves"], limit=8)
+    
+    p1_moves = damaging_moves_for_pokemon(p1["id"], p1["moves"], limit=8)
     p2_moves = damaging_moves_for_pokemon(p2["id"], p2["moves"], limit=8)
 
     left, right = st.columns(2, gap="large")
@@ -625,10 +626,6 @@ p1_moves = damaging_moves_for_pokemon(p1["id"], p1["moves"], limit=8)
             )
 
     st.divider()
-
-################################################################
-# Blanca
-################################################################
     st.subheader("Combat Simulation")
 
     m1 = st.session_state.get("p1_move")
