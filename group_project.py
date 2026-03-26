@@ -1,136 +1,7 @@
 ################################################################
 # Ricardo
 ################################################################
-import streamlit as st
-import requests
-import time
-import base64
-import random
-import pandas as pd
-import plotly.express as px
-from PIL import Image
-from io import BytesIO
-from typing import Optional
 
-MAX_DEX = 649
-LEVEL = 50
-MAX_ROUNDS = 100
-
-TYPE_COLORS = {
-    "normal": "#A8A77A",
-    "fire": "#EE8130",
-    "water": "#6390F0",
-    "electric": "#F7D02C",
-    "grass": "#7AC74C",
-    "ice": "#96D9D6",
-    "fighting": "#C22E28",
-    "poison": "#A33EA1",
-    "ground": "#E2BF65",
-    "flying": "#A98FF3",
-    "psychic": "#F95587",
-    "bug": "#A6B91A",
-    "rock": "#B6A136",
-    "ghost": "#735797",
-    "dragon": "#6F35FC",
-    "dark": "#705746",
-    "steel": "#B7B7CE",
-    "fairy": "#D685AD",
-}
-
-STAT_LABELS = {
-    "hp": "HP",
-    "attack": "Attack",
-    "defense": "Defense",
-    "special-attack": "Sp. Atk",
-    "special-defense": "Sp. Def",
-    "speed": "Speed",
-}
-
-def safe_get(url: str, timeout: int = 10) -> Optional[requests.Response]:
-    try:
-        return requests.get(url, timeout=timeout)
-    except requests.exceptions.ConnectionError:
-        st.error("Connection error: couldn't reach PokeAPI. Check your internet connection and try again.")
-        return None
-    except requests.exceptions.Timeout:
-        st.error("Request timed out while contacting PokeAPI. Please try again.")
-        return None
-    except requests.exceptions.RequestException as e:
-        st.error(f"Network error while contacting PokeAPI: {e}")
-        return None
-
-
-def stats_dict(p: dict) -> dict:
-    return {s["stat"]["name"]: s["base_stat"] for s in p["stats"]}
-
-
-def img_file_to_data_uri(path: str) -> str:
-    with open(path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode("utf-8")
-    return f"data:image/png;base64,{b64}"
-
-
-def pil_to_data_uri(img: Image.Image, fmt="PNG") -> str:
-    buf = BytesIO()
-    img.save(buf, format=fmt)
-    b64 = base64.b64encode(buf.getvalue()).decode()
-    return f"data:image/{fmt.lower()};base64,{b64}"
-
-
-def load_image(url: str) -> Optional[Image.Image]:
-    r = safe_get(url, timeout=10)
-    if r is None:
-        return None
-    try:
-        r.raise_for_status()
-    except requests.exceptions.HTTPError:
-        st.error("Failed to download a sprite image.")
-        return None
-    try:
-        return Image.open(BytesIO(r.content))
-    except Exception:
-        st.error("Downloaded sprite image could not be opened.")
-        return None
-
-
-def load_sprite_scaled(url: str, scale: int = 3) -> Optional[Image.Image]:
-    img = load_image(url)
-    if img is None:
-        return None
-    img = img.convert("RGBA")
-    w, h = img.size
-    return img.resize((w * scale, h * scale), resample=Image.NEAREST)
-
-
-def type_chips_html(types: list[str]) -> str:
-    return " ".join(f'<span class="type-chip type-{t}">{t.upper()}</span>' for t in types)
-
-
-def reset_all():
-    for k in ("phase", "name1", "name2", "p1", "p2", "p1_move", "p2_move", "battle_log", "battle_winner", "hp_history"):
-        if k in st.session_state:
-            del st.session_state[k]
-    st.rerun()
-
-
-def type_badge_html(t: str) -> str:
-    color = TYPE_COLORS.get(t, "#999999")
-    return f"""
-    <div style="
-        width: 84px;
-        height: 30px;
-        border-radius: 999px;
-        background: {color};
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 900;
-        font-size: 11px;
-        line-height: 30px;
-        color: rgba(0,0,0,0.85);
-        border: 1px solid rgba(255,255,255,0.35);
-    ">{t.upper()}</div>
-    """
 
 ################################################################
 # Jacek
@@ -140,8 +11,108 @@ def type_badge_html(t: str) -> str:
 ################################################################
 # Alberto
 ################################################################
+def run_battle(p1: dict, p2: dict, m1: dict, m2: dict) -> tuple[list[dict], list[dict], str]:
+    s1 = stats_dict(p1)
+    s2 = stats_dict(p2)
 
+    p1_types = [t["type"]["name"] for t in p1["types"]]
+    p2_types = [t["type"]["name"] for t in p2["types"]]
 
+    hp1 = s1["hp"]
+    hp2 = s2["hp"]
+
+    log = []
+    hp_hist = [
+        {"round": 0, "pokemon": p1["name"].title(), "hp": hp1},
+        {"round": 0, "pokemon": p2["name"].title(), "hp": hp2},
+    ]
+
+    def first_attacker() -> str:
+        if s1["speed"] > s2["speed"]:
+            return "p1"
+        if s2["speed"] > s1["speed"]:
+            return "p2"
+        return random.choice(["p1", "p2"])
+
+    for rnd in range(1, MAX_ROUNDS + 1):
+        if hp1 <= 0 or hp2 <= 0:
+            break
+
+        first = first_attacker()
+        order = [first, "p2" if first == "p1" else "p1"]
+
+        for who in order:
+            if hp1 <= 0 or hp2 <= 0:
+                break
+
+            if who == "p1":
+                atk_p, def_p = p1, p2
+                atk_stats, def_stats = s1, s2
+                def_types = p2_types
+                move = m1
+                defender_hp = hp2
+            else:
+                atk_p, def_p = p2, p1
+                atk_stats, def_stats = s2, s1
+                def_types = p1_types
+                move = m2
+                defender_hp = hp1
+
+            move_name = move["name"].replace("-", " ").title()
+            power = int(move["power"]) if move["power"] is not None else 0
+            acc = move["accuracy"]
+            acc_val = 100 if acc is None else int(acc)
+            dmg_class = move["damage_class"]
+            mtype = move["type"]
+
+            atk_stat, def_stat = pick_atk_def(atk_stats, def_stats, dmg_class)
+            eff = effectiveness_multiplier(mtype, def_types)
+
+            hit = random.random() < (acc_val / 100.0)
+            if not hit:
+                damage = 0
+                result = "Missed"
+            else:
+                base_dmg = (2 * LEVEL / 5 + 2) * power
+                stat_ratio = atk_stat / max(1, def_stat)
+                damage = int((base_dmg * stat_ratio / 50 + 2) * eff)
+                result = "Hit"
+
+            defender_hp_after = max(0, defender_hp - damage)
+
+            if who == "p1":
+                hp2 = defender_hp_after
+            else:
+                hp1 = defender_hp_after
+
+            log.append({
+                "Round": rnd,
+                "Attacker": atk_p["name"].title(),
+                "Move": move_name,
+                "Move Type": mtype,
+                "Class": dmg_class,
+                "Power": power,
+                "Accuracy": acc_val,
+                "Effectiveness": eff,
+                "Damage": damage,
+                "Defender": def_p["name"].title(),
+                "Defender HP": defender_hp_after,
+                "Result": result,
+            })
+
+        hp_hist.append({"round": rnd, "pokemon": p1["name"].title(), "hp": hp1})
+        hp_hist.append({"round": rnd, "pokemon": p2["name"].title(), "hp": hp2})
+
+    if hp1 <= 0 and hp2 <= 0:
+        winner = "Draw (double KO)"
+    elif hp2 <= 0:
+        winner = p1["name"].title()
+    elif hp1 <= 0:
+        winner = p2["name"].title()
+    else:
+        winner = "Draw (100-round cap)"
+
+    return log, hp_hist, winner
 ################################################################
 # Shadi
 ################################################################
